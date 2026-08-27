@@ -265,3 +265,10 @@ is the tested primary. Real keys needed to exercise the fee-QR path.
 - RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET / RAZORPAY_WEBHOOK_SECRET — live payment collection (currently disabled, app works without).
 - GEMINI_API_KEY — dedicated Gemini key for prod (EMERGENT_LLM_KEY fallback active in preview).
 - RESEND_API_KEY + SENDER_EMAIL — invoice/invite emails (currently 503 by design).
+
+## Iter 17 — single-scan + UTR validation + live keys (bug fixes, verified)
+- SINGLE SCAN: manual UPI flow now locks the merchant in ONE scan. first_scan() sets state=awaiting_merchant_payment (second_qr_verified/payment_session_locked=True). The old "scan again to confirm" step is gone. (PayNow.jsx STEP 2 second-scan block removed.)
+- UTR VALIDATION: full UTR must be EXACTLY 12 digits — enforced server-side (manual_flow_service.submit_proof: isdigit + len==12 else 400) and client-side (PayNow.jsx utr-full-input: digit-only, maxLength 12, live x/12 counter, submit guard).
+- KEYS: founder's GEMINI_API_KEY + LIVE Razorpay keys (rzp_live_) added to backend/.env; RAZORPAY_ENV=live. /api/payments/config -> enabled=true, mode=live. ⚠️ LIVE = real money on any Razorpay fee payment.
+- Verified: iteration_17.json — 8/8 backend + frontend E2E (single scan -> ready-to-pay -> proof 12-digit UTR -> wallet-first receipt generated, no real Razorpay checkout triggered).
+- Backlog cleanup (non-blocking): dead /second-scan route + PayNow.jsx line ~173 'second_qr_required' reference can be removed; set RAZORPAY_WEBHOOK_SECRET to enable the webhook safety-net.

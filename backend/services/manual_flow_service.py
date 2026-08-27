@@ -119,16 +119,19 @@ async def first_scan(user, payee_upi, payee_name=None, merchant_amount=None, exp
         "user_id": user["id"],
         "company_id": (expense_draft or {}).get("company_id") or user.get("company_id"),
         "flow_mode": "manual_upi_double_scan",
-        "state": S_SECOND_QR_REQUIRED,
+        # SINGLE-SCAN flow: one scan locks the merchant and moves straight to
+        # "awaiting merchant payment" (no confirm re-scan). The second-scan fields
+        # are marked verified so downstream transitions remain valid.
+        "state": S_AWAITING_MERCHANT_PAYMENT,
         # frozen merchant snapshot (immutable after this)
         "payee_name_snapshot": (payee_name or "").strip() or None,
         "payee_upi_snapshot": upi,
         "merchant_amount_paise": merchant_amount_paise,
         "first_qr_verified": True,
         "first_qr_payload_hash": None,
-        "second_qr_verified": False,
-        "second_qr_verified_at": None,
-        "payment_session_locked": False,
+        "second_qr_verified": True,
+        "second_qr_verified_at": now_iso(),
+        "payment_session_locked": True,
         "merchant_payment_status": "awaiting_payment",
         "merchant_payment_claimed_at": None,
         "merchant_verification_status": "unverified",
@@ -231,8 +234,11 @@ async def submit_proof(user, tid, utr_full=None, utr_last4=None, proof_file=None
     utr_full = (utr_full or "").strip() or None
     utr_last4 = (utr_last4 or "").strip() or None
     if utr_full:
-        digits = "".join(c for c in utr_full if c.isalnum())
-        utr_last4 = digits[-4:] if len(digits) >= 4 else utr_last4
+        digits = "".join(c for c in utr_full if c.isdigit())
+        if len(digits) != 12:
+            raise ValueError("UTR number must be exactly 12 digits")
+        utr_full = digits
+        utr_last4 = digits[-4:]
         proof_status = "proof_submitted"
         merchant_payment_status = "proof_submitted"
     elif utr_last4:

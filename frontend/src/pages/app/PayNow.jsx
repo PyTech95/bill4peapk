@@ -206,16 +206,6 @@ export default function PayNow() {
     finally { setBusy(false); }
   };
 
-  const doSecondScan = async (parsed) => {
-    setBusy(true);
-    try {
-      const { data } = await api.post(`/manual-pay/${txn.transaction_id}/second-scan`, { payee_upi: parsed.upi });
-      if (!data.match) { toast.error(data.message || 'QR does not match'); setTxn(data); return; }
-      setTxn(data); toast.success('QR verified ✓');
-    } catch (e) { toast.error(e.response?.data?.detail || 'Scan failed'); }
-    finally { setBusy(false); }
-  };
-
   const confirm = async (completed) => {
     setBusy(true);
     try { const { data } = await api.post(`/manual-pay/${txn.transaction_id}/confirm`, { completed }); setTxn(data); }
@@ -224,6 +214,7 @@ export default function PayNow() {
   };
 
   const submitProof = async () => {
+    if (utrFull && utrFull.length !== 12) { toast.error('UTR number must be exactly 12 digits'); return; }
     if (!utrFull && !utrLast4 && !screenshot) { toast.error('Enter a UTR, last 4 digits, or upload a screenshot'); return; }
     setBusy(true);
     try {
@@ -306,7 +297,7 @@ export default function PayNow() {
         )}
       </div>
 
-      {/* STEP 1 — first QR scan */}
+      {/* STEP 1 — single QR scan */}
       {!txn && (
         <>
           <div className="rounded-xl border p-4 bg-muted/30" data-testid="bill-summary">
@@ -314,21 +305,11 @@ export default function PayNow() {
             <div className="text-3xl font-bold font-mono">{money(draftAmount)}</div>
             {draft?.category && <div className="text-sm text-muted-foreground mt-1">{draft.category}{draft.sub_category ? ` · ${draft.sub_category}` : ''}</div>}
           </div>
-          <QrScanner title="Scan merchant QR" hint="Scan the merchant's UPI QR to capture their details." onResult={doFirstScan} onCancel={() => nav('/app/dashboard')} />
+          <QrScanner title="Scan merchant QR" hint="Scan the merchant's UPI QR once to continue." onResult={doFirstScan} onCancel={() => nav('/app/dashboard')} />
         </>
       )}
 
-      {/* STEP 2 — second QR scan (must match) */}
-      {st === 'second_qr_required' && (
-        <QrScanner
-          title="Scan merchant QR again"
-          hint="For your safety, scan the same merchant QR to confirm the payee before paying."
-          onResult={doSecondScan}
-          onCancel={cancel}
-        />
-      )}
-
-      {/* STEP 3 — ready to pay merchant directly */}
+      {/* STEP 2 — ready to pay merchant directly (single scan) */}
       {st === 'awaiting_merchant_payment' && (
         <div className="space-y-4" data-testid="ready-to-pay">
           <div className="rounded-xl border p-4">
@@ -372,8 +353,9 @@ export default function PayNow() {
             <div className="mt-1">Amount <b>{money(txn.merchant_amount)}</b></div>
           </div>
           <div>
-            <label className="text-sm font-medium">Full UPI Transaction ID / UTR (preferred)</label>
-            <Input value={utrFull} onChange={(e) => setUtrFull(e.target.value)} placeholder="e.g. 4012 3456 7890" data-testid="utr-full-input" />
+            <label className="text-sm font-medium">UPI Transaction ID / UTR (12 digits)</label>
+            <Input value={utrFull} onChange={(e) => setUtrFull(e.target.value.replace(/\D/g, '').slice(0, 12))} maxLength={12} inputMode="numeric" placeholder="12-digit UTR e.g. 401234567890" data-testid="utr-full-input" />
+            <p className="text-xs text-muted-foreground mt-1" data-testid="utr-digit-count">{utrFull.length}/12 digits</p>
           </div>
           <div>
             <label className="text-sm font-medium">Or last 4 digits</label>
