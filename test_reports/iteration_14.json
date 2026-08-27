@@ -1,0 +1,50 @@
+{
+  "summary": "Independently verified the BILL4PE manual double-scan UPI flow (PAYMENT_FLOW_MODE=manual_upi_double_scan) end-to-end. Backend: 30 pytest cases across 3 new files covering first-scan freeze + 1% fee math (₹200 -> 200 paise), case-insensitive second-scan match/lock, mismatch blocking, confirm YES/NOT-YET, proof (full UTR / last4 / screenshot) with content-type + 5MB validation and owner/admin-only proof download (403 for other users), wallet-first generate (50 -> 48, exactly one ₹2 debit), idempotent re-generate (same BILL-2026-NNNNNN, no second debit), 4x concurrent generate => 1 bill + 1 debit, needs_fee=true when wallet < fee, fee-order graceful 400 (Razorpay unset, expected), IDOR (404 across users for read/second-scan/confirm/generate/cancel), recovery via GET /manual-pay/{tid} + /history, admin list with masked UTR + review (non-admin 403), bill_snapshot.document_title + PDF (%PDF, 200), no payout records (db.payouts empty). Frontend: full mobile E2E on /app/pay via manual-UPI fallback — bill summary ₹200, first scan locks merchant, mismatch (other@ybl) shows 'does not match' and stays on second scan, ABCSTORE@YBL matches -> ready-to-pay (ABC STORE / ₹200.00), Not-yet stays, payment-done -> proof -> UTR submit -> generate screen (fee 1.00% ₹2.00) -> receipt-done BILL-2026-000027, wallet 48, view-receipt navigates to bill page. 28/30 pytest pass; the only 2 non-passes are the app's own 5-registrations/60s IP rate limiter (429) hitting the test harness, not product defects.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/auth/register", "issue": "In-memory IP rate limit (5/60s) causes 429 for parallel test runs; expected app behavior but makes suites with many fresh users flaky. Tests now retry on 429; consider raising the limit in preview env only."},
+      {"endpoint": "POST /api/auth/login", "issue": "No per-account lockout counter after N failed passwords (only 10/60s IP sliding window). Playbook expectation of 'lockout after 5 fails' is not implemented — credential stuffing across rotating IPs is unthrottled."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "BillGen.jsx (receipt/bill detail)", "issue": "Header says 'Payment captured' and status card says 'Paid / Transaction recorded' even in manual mode where the merchant payment is only user-confirmed and merchant_verification_status='unverified'. Backend snapshot correctly says 'Payment Confirmed by User' — the UI should use bill_snapshot.merchant_payment_status_label to avoid asserting a bank-verified payment.", "selector": "/app/frontend/src/pages/app/BillGen.jsx:153,160", "priority": "MEDIUM"},
+      {"component": "BillGen.jsx fee display", "issue": "Fee is recomputed client-side: const fee = Math.max(1, total*0.01) — duplicates server logic and ignores authoritative expense.bill_fee / platform_fee_paise (also enforces an unofficial ₹1 minimum the backend does not have).", "selector": "/app/frontend/src/pages/app/BillGen.jsx:148", "priority": "MEDIUM"},
+      {"component": "OnboardingTour", "issue": "Full-screen overlay (data-testid=onboarding-overlay, z-[70]) blocks all /app/pay interactions for every new user until skipped; automation/first-run users cannot click manual-upi-submit. Not a functional bug but worth an auto-dismiss on the payment route.", "selector": "[data-testid=\"onboarding-overlay\"]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/app/pay second-scan", "issues": ["When the camera is unavailable the scanner box renders as a solid green video area with stray overlay text ('0:00:03:100 62') instead of a clean 'camera unavailable' placeholder"]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_manual_double_scan_iter14.py",
+    "/app/backend/tests/test_manual_ds_pdf_and_payout.py",
+    "/app/backend/tests/test_manual_ds_concurrency.py",
+    "/app/test_reports/pytest/manual_ds_iter14.xml"
+  ],
+  "action_items": [
+    "BillGen.jsx: replace 'Payment captured'/'Paid' wording with bill_snapshot.merchant_payment_status_label ('Payment Confirmed by User') for manual_upi_double_scan receipts.",
+    "BillGen.jsx: use server-provided expense.bill_fee instead of Math.max(1, total*0.01).",
+    "Consider auto-skipping OnboardingTour on /app/pay (overlay intercepts pointer events on the payment flow).",
+    "Optional: add per-account failed-login lockout in addition to the IP rate limiter."
+  ],
+  "critical_code_review_comments": [
+    "manual_flow_service._make_receipt can return {'bill_id': None} when another caller holds bill_status='generating'; generate then responds generated=true with bill_id=null. Concurrency test showed all 4 callers got the same bill, but a slower DB could expose the null — prefer a short re-read/poll before returning.",
+    "_debit_wallet_fee mixes rupee floats (users.wallet_balance) with integer paise ledger; the $gte guard uses a float which can mis-compare for fractional balances. Storing wallet_balance in paise would remove the rounding risk.",
+    "submit_proof allows re-submission after proof_submitted and overwrites utr_full/last4 (and fee_status back to 'due'), even after fee is paid — bounded by generate idempotency but consider freezing proof once fee_status='paid'."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_manual_double_scan_iter14.py",
+    "/app/backend/tests/test_manual_ds_pdf_and_payout.py",
+    "/app/backend/tests/test_manual_ds_concurrency.py"
+  ],
+  "success_rate": {"backend": "100% (28/30 executed pass; 2 blocked by the app's own register 429 rate limit, no product defect)", "frontend": "100% of the double-scan flow steps passed"},
+  "seed_data_creation": "Several TEST_mds_*/TEST_fe_*/TEST_pdf_*/TEST_conc_*@example.com individual users (₹50 welcome bonus each) plus their manual_transactions/expenses. Latest bills BILL-2026-0000xx.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "Super admin dhiraj@callnman.com / Bill4Pe@2026 (verified, bcrypt $2b$12, wallet ₹8). Fresh users via POST /api/auth/register.",
+  "context_for_next_testing_agent": "Backend manual double-scan flow is solid: fee math, match/mismatch, proof authz, wallet single-debit, idempotency, concurrency, IDOR, admin, PDF all verified. Frontend E2E verified with manual-UPI fallback — remember to seed localStorage bill4pe_token AND bill4pe_user AND bill4pe_onboarded_v1='1' (onboarding overlay otherwise blocks clicks), plus sessionStorage bill4pe_draft. Register endpoint is rate limited to 5/60s per IP — space out registrations. Remaining untested: Razorpay fee QR path (integration unset by design), corporate/company-scoped manual txns, and screenshot-proof rendering in the receipt PDF.",
+  "rca_of_the_issue": "No functional defect found in the new flow. The 2 pytest errors are caused by RateLimitMiddleware RULES['/api/auth/register'] = (5, 60) rejecting the harness's rapid fresh-user registrations (429); each affected test passes when run individually. The frontend's earlier click failures were caused by the OnboardingTour full-screen overlay, resolved in the test by pre-setting localStorage bill4pe_onboarded_v1."
+}

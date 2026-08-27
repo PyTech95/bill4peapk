@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="2" failures="0" skipped="0" tests="30" time="69.822" timestamp="2026-08-26T09:30:59.541144+00:00" hostname="agent-env-66c2d456-2690-425b-b027-ed18d5f38160"><testcase classname="tests.test_manual_double_scan_iter14.TestFirstScan" name="test_first_scan_freezes_merchant_and_fee" time="0.797" /><testcase classname="tests.test_manual_double_scan_iter14.TestProof" name="test_proof_full_utr" time="1.024" /><testcase classname="tests.test_manual_double_scan_iter14.TestFirstScan" name="test_first_scan_invalid_upi" time="0.063" /><testcase classname="tests.test_manual_double_scan_iter14.TestFirstScan" name="test_first_scan_zero_amount" time="0.100" /><testcase classname="tests.test_manual_double_scan_iter14.TestFirstScan" name="test_first_scan_requires_auth" time="0.109" /><testcase classname="tests.test_manual_double_scan_iter14.TestProof" name="test_proof_last4_only" time="0.337" /><testcase classname="tests.test_manual_double_scan_iter14.TestSecondScan" name="test_second_scan_case_insensitive_match_locks" time="0.177" /><testcase classname="tests.test_manual_double_scan_iter14.TestSecondScan" name="test_second_scan_mismatch_blocks" time="0.118" /><testcase classname="tests.test_manual_double_scan_iter14.TestProof" name="test_proof_empty_rejected" time="0.466" /><testcase classname="tests.test_manual_double_scan_iter14.TestSecondScan" name="test_confirm_before_second_scan_rejected" time="0.116" /><testcase classname="tests.test_manual_double_scan_iter14.TestSecurity" name="test_idor_cross_user" time="1.229" /><testcase classname="tests.test_manual_double_scan_iter14.TestProof" name="test_proof_screenshot_png_ok_and_owner_only_download" time="1.237" /><testcase classname="tests.test_manual_double_scan_iter14.TestSecurity" name="test_recovery_status_and_history" time="0.379" /><testcase classname="tests.test_manual_double_scan_iter14.TestProof" name="test_proof_screenshot_jpg_webp_ok" time="1.086" /><testcase classname="tests.test_manual_double_scan_iter14.TestSecurity" name="test_unknown_tid_404" time="0.058" /><testcase classname="tests.test_manual_double_scan_iter14.TestRegression" name="test_login_and_me" time="0.462" /><testcase classname="tests.test_manual_double_scan_iter14.TestRegression" name="test_bad_login" time="0.325" /><testcase classname="tests.test_manual_double_scan_iter14.TestRegression" name="test_wallet_and_expenses" time="0.143" /><testcase classname="tests.test_manual_double_scan_iter14.TestGenerate" name="test_wallet_debit_once_and_idempotent_generate" time="0.915" /><testcase classname="tests.test_manual_double_scan_iter14.TestProof" name="test_proof_bad_content_type_rejected" time="0.276" /><testcase classname="tests.test_manual_double_scan_iter14.TestProof" name="test_proof_oversize_rejected" time="0.579" /><testcase classname="tests.test_manual_double_scan_iter14.TestGenerate" name="test_needs_fee_when_wallet_insufficient" time="9.795" /><testcase classname="tests.test_manual_ds_pdf_and_payout" name="test_pdf_title_and_fee_snapshot" time="1.217" /><testcase classname="tests.test_manual_ds_pdf_and_payout" name="test_no_payout_for_merchant_amount" time="0.076" /><testcase classname="tests.test_manual_double_scan_iter14.TestConfig" name="test_config" time="0.112" /><testcase classname="tests.test_manual_double_scan_iter14.TestAdmin" name="test_admin_list_masked_and_review" time="0.938" /><testcase classname="tests.test_manual_double_scan_iter14.TestAdmin" name="test_non_admin_forbidden" time="0.152" /><testcase classname="tests.test_manual_double_scan_iter14.TestConfirm" name="test_not_yet_keeps_awaiting_then_yes_claims" time="61.053"><error message="failed on setup with &quot;AssertionError: register failed 429 {&quot;detail&quot;:&quot;Too many requests. Please slow down and try again shortly.&quot;}&#10;assert 429 in (200, 201)&#10; +  where 429 = &lt;Response [429]&gt;.status_code&quot;">@pytest.fixture(scope="module")
+    def user_a():
+&gt;       return _register()
+               ^^^^^^^^^^^
+
+tests/test_manual_double_scan_iter14.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def _register():
+        """Register a fresh individual user (retries on the API rate limiter)."""
+        email = f"TEST_mds_{uuid.uuid4().hex[:10]}@example.com"
+        r = None
+        for attempt in range(6):
+            r = requests.post(f"{API}/auth/register", json={
+                "email": email, "password": "Test@12345", "name": "TEST Manual Scan"}, timeout=30)
+            if r.status_code != 429:
+                break
+            time.sleep(10)
+&gt;       assert r.status_code in (200, 201), f"register failed {r.status_code} {r.text[:300]}"
+E       AssertionError: register failed 429 {"detail":"Too many requests. Please slow down and try again shortly."}
+E       assert 429 in (200, 201)
+E        +  where 429 = &lt;Response [429]&gt;.status_code
+
+tests/test_manual_double_scan_iter14.py:37: AssertionError</error></testcase><testcase classname="tests.test_manual_double_scan_iter14.TestNoPayout" name="test_no_payout_records_for_manual_txns" time="0.000"><error message="failed on setup with &quot;AssertionError: register failed 429 {&quot;detail&quot;:&quot;Too many requests. Please slow down and try again shortly.&quot;}&#10;assert 429 in (200, 201)&#10; +  where 429 = &lt;Response [429]&gt;.status_code&quot;">@pytest.fixture(scope="module")
+    def user_a():
+&gt;       return _register()
+               ^^^^^^^^^^^
+
+tests/test_manual_double_scan_iter14.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def _register():
+        """Register a fresh individual user (retries on the API rate limiter)."""
+        email = f"TEST_mds_{uuid.uuid4().hex[:10]}@example.com"
+        r = None
+        for attempt in range(6):
+            r = requests.post(f"{API}/auth/register", json={
+                "email": email, "password": "Test@12345", "name": "TEST Manual Scan"}, timeout=30)
+            if r.status_code != 429:
+                break
+            time.sleep(10)
+&gt;       assert r.status_code in (200, 201), f"register failed {r.status_code} {r.text[:300]}"
+E       AssertionError: register failed 429 {"detail":"Too many requests. Please slow down and try again shortly."}
+E       assert 429 in (200, 201)
+E        +  where 429 = &lt;Response [429]&gt;.status_code
+
+tests/test_manual_double_scan_iter14.py:37: AssertionError</error></testcase><testcase classname="tests.test_manual_ds_concurrency" name="test_concurrent_generate_single_debit_single_bill" time="1.669" /></testsuite></testsuites>

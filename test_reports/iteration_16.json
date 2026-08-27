@@ -1,0 +1,28 @@
+{
+  "summary": "Iteration 16 backend-only smoke of the freshly ported BILL4PE app in this Emergent environment. Ran 16 pytest cases against the live public API (REACT_APP_BACKEND_URL + /api) covering all requested flows — 16/16 PASSED. Verified: (1) GET /api/ returns app=BILL4PE, status=ok; (2) POST /api/auth/register returns JWT + user with wallet_balance=50.0 welcome bonus; (3) POST /api/auth/login works with the newly registered user; (4) super-admin admin@newbill.com / NewBill@2026 logs in and role=='superadmin' (seed working); (5) GET /api/auth/me returns 401 without token and 200 with token (password field stripped); (6) core billing journey — POST /api/expenses creates an expense (total computed 123.45 from items), then GET /api/expenses/{id} + GET /api/expenses both return it, confirming persist->retrieve; (7) reports — POST /api/reports creates a report over that expense (expense_count=1, total=123.45) and GET /api/reports lists it; (8) input validation — empty body to POST /api/expenses returns 422 (Pydantic), invalid email in /auth/register returns 422 (no 500s); (9) Razorpay graceful degradation — GET /api/payments/config returns enabled=false, and POST /api/payments/razorpay/order + /api/payments/merchant/create-order both return handled 4xx/502 with a JSON detail (NOT a 500 crash) when keys are absent. Also verified GET /api/expenses without a token is 401.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/bills/{eid}/generate", "issue": "Router imports razorpay client at module load and reads RAZORPAY_KEY_ID/SECRET at import time (not through services.razorpay_service). Not a bug today (client is None -> 503 raised only if a razorpay_* proof body is sent, wallet path still works), but this bypasses the shared razorpay_service abstraction used elsewhere and won't hot-reload if keys are added to .env without a restart."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter16_deploy.py",
+    "/app/test_reports/pytest/iter16_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "backend/routers/bills.py instantiates its own razorpay.Client at import (lines 23-25) instead of delegating to services.razorpay_service — duplicates config reading, and requires a backend restart if keys are later added. Route this through razorpay_service for consistency.",
+    "backend/server.py is 169 lines with 5 @on_event('startup') hooks — legacy backfill_legacy_corporate should probably be a one-shot migration script rather than executing on every boot.",
+    "core/models.ExpenseCreate.items has no min_length=1 validator; an empty items array currently produces total=0 and a persisted expense (accepted by API). Consider Field(..., min_length=1) to reject empty carts at the Pydantic layer."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (16/16)", "frontend": "N/A (frontend testing skipped per request)"},
+  "test_credentials": "Super admin: admin@newbill.com / NewBill@2026 (verified role=superadmin). New per-run individual: qa_iter16_<uuid>@bill4petest.com / Test@1234 (welcome bonus ₹50 verified).",
+  "seed_data_creation": "One fresh individual per pytest run (unique uuid-suffixed email) + one expense (TEST_Cafe_Iter16, ₹123.45) + one report (TEST_Iter16 Report). No production data touched.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend port + deploy is healthy. All auth, expenses create->persist->retrieve, reports, validation, and Razorpay-unconfigured degradation flows are green against the public URL. Reusable regression suite: /app/backend/tests/test_iter16_deploy.py (16 tests, ~2.3s, uses pytest-xdist workers). Email (Resend) not exercised — /api/bills/{eid}/email returns 503 by design when EMERGENT_EMAIL_KEY is unset. Rate limit middleware is on auth+payments (5/60s per IP) so heavy re-runs should pace registrations.",
+  "rca_of_the_issue": "N/A — no bugs found this iteration."
+}

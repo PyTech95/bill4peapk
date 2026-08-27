@@ -1,0 +1,35 @@
+{
+  "summary": "Frontend-only targeted retest of the BILL4PE manual double-scan abandon/resume fix on /app/pay (PayNow.jsx). Registered a fresh individual (₹50 bonus), seeded bill4pe_token/user + bill4pe_onboarded_v1 + sessionStorage bill4pe_draft, and drove the flow via the manual-UPI fallback (camera unavailable in automation). All 6 requested scenarios PASSED, each cross-verified against GET /api/manual-pay/{tid}. SCENARIO A (reported bug): after a first scan of ABC STORE (state=second_qr_required) and navigating to /app/dashboard without paying, returning to /app/pay showed a FRESH first-scan (bill-summary ₹200 + qr-scanner), no 'ABC STORE' text, localStorage bill4pe_manual_txn cleared, and the old txn B4P-2026-E9C7FC43 was cancelled server-side (state=cancelled, merchant_payment_status=cancelled). A new first scan with xyz@ybl created a NEW transaction_id (B4P-2026-B1B5D93D) locked to xyz@ybl. SCENARIO C (extra, not requested): abandoning at awaiting_merchant_payment (after a matching second scan, before confirming) also starts fresh and cancels the old txn. SCENARIO B: proof stage (merchant_payment_claimed) still resumes correctly on return — proof-screen re-rendered with the same txn id and same vendor mno@ybl/₹200. start-new-payment header button is visible whenever a txn is active and not completed; clicking it cancelled the txn on the backend (B4P-2026-EDCEA801 -> cancelled), cleared localStorage, hid the button and returned to a fresh first-scan. REGRESSION happy path end-to-end passed: first scan -> MISMATCH second scan shows 'QR does not match the merchant selected for this bill.' and stays blocked on the second-scan screen (ready-to-pay not leaked) -> matching second scan -> ready-to-pay (rtp-merchant 'MNO MART', rtp-amount ₹200.00) -> payment-done-btn -> proof (utr-full-input + submit-proof-btn) -> generate-screen showing 1.00% / ₹2.00 fee -> generate-receipt-btn (wallet path) -> receipt-done with Bill ID BILL-2026-000090; wallet correctly went ₹50.00 -> ₹48.00. No console errors (only a benign Canvas2D willReadFrequently warning from the jsQR loop).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "/app/pay header",
+        "issues": [
+          "Sonner toast renders top-center and visually overlaps/obscures the 'Start new payment' header link (seen on the mismatch screen). Cosmetic only — the button was still clickable; consider top-right toast position or more header top padding.",
+          "'Start new payment' is plain red text with no border/icon; low affordance for a destructive action. Consider a small outline/ghost button.",
+          "jsQR scan loop logs a repeated Canvas2D 'willReadFrequently' performance warning; pass { willReadFrequently: true } to getContext('2d')."
+        ]
+      }
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_manual_double_scan_iter14.py"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "PayNow.jsx mount effect uses api.post(`/manual-pay/${tid}/cancel`) fire-and-forget for abandoned early states — verified working, but the cancel is not awaited before the fresh scan, so a very fast first-scan could race the cancel. Harmless today (separate transaction ids) but worth awaiting for determinism.",
+    "RESUMABLE list is duplicated conceptually with the early-state list ['second_qr_required','awaiting_merchant_payment']; any new backend state added later will silently fall into the 'abandon' branch. Consider deriving from a single state map."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only request; 6/6 supporting GET /api/manual-pay/{tid} verifications passed)", "frontend": "100% (6/6 scenarios)"},
+  "seed_data_creation": "Registered individual qa_iter15_a@bill4petest.com / Test@12345 (₹50 bonus, now ₹48). Transactions created: B4P-2026-E9C7FC43 (cancelled), B4P-2026-B1B5D93D (left in second_qr_required — will auto-cancel on next /app/pay visit), B4P-2026-0D120D2D (completed, BILL-2026-000090), B4P-2026-EDCEA801 (cancelled), B4P-2026-81D0920B (cancelled).",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": false,
+  "test_credentials": "qa_iter15_a@bill4petest.com / Test@12345 (individual). Note: @example.test domains are rejected by email validation — use a normal TLD when registering test users.",
+  "context_for_next_testing_agent": "Camera is unavailable in automation — always use manual-UPI fallback (manual-upi-name / manual-upi-input / manual-upi-submit). Seed localStorage bill4pe_token + bill4pe_user + bill4pe_onboarded_v1='1' and sessionStorage bill4pe_draft before goto /app/pay. Registration is rate-limited 5/60s per IP and rejects reserved domains like example.test. The abandon-vs-resume logic is confirmed working for second_qr_required and awaiting_merchant_payment (abandon+cancel) and merchant_payment_claimed (resume); proof_submitted/fee_due/fee_pending resume paths were not individually re-exercised on return-to-page (only merchant_payment_claimed was), so that is a small remaining gap if needed.",
+  "rca_of_the_issue": "Original bug: the mount effect auto-resumed ANY pending txn in localStorage 'bill4pe_manual_txn', so an abandoned first scan re-opened the old vendor. Fix (verified): only money-sensitive states (merchant_payment_claimed, proof_submitted, fee_due, fee_pending) resume; second_qr_required / awaiting_merchant_payment are cancelled on the backend and cleared from localStorage so a fresh first scan starts. Confirmed end-to-end in the browser plus backend state assertions."
+}
