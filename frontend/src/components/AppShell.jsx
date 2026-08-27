@@ -13,7 +13,7 @@ const TopBar = () => {
   const isCorporate = user?.user_type === 'corporate';
 
   return (
-    <header className="sticky top-0 z-30 backdrop-blur-xl bg-white/85 border-b border-soft">
+    <header className="sticky top-0 z-30 backdrop-blur-xl bg-white/85 border-b border-soft safe-top safe-x">
       <div className="max-w-screen-sm mx-auto px-4 h-14 flex items-center justify-between">
         {showBack ? (
           <button
@@ -59,7 +59,7 @@ const BottomNav = () => {
       isActive ? 'text-navy font-semibold' : 'text-slate-400'
     }`;
   return (
-    <nav className="sticky bottom-0 z-30 bg-white border-t border-soft">
+    <nav className="sticky bottom-0 z-30 bg-white border-t border-soft safe-bottom safe-x">
       <div className="max-w-screen-sm mx-auto flex">
         <NavLink to="/app" end className={link} data-testid="bottomnav-home">
           <Home className="w-5 h-5" />
@@ -90,7 +90,7 @@ const BottomNav = () => {
 
 export default function AppShell() {
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className="min-h-screen flex flex-col bg-white" style={{ minHeight: '100dvh' }}>
       <TopBar />
       <main className="flex-1 max-w-screen-sm w-full mx-auto px-4 py-4 pb-6">
         <Outlet />

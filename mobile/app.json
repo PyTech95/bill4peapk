@@ -1,0 +1,93 @@
+{
+  "expo": {
+    "name": "BILL4PE",
+    "slug": "bill4pe",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "bill4pe",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#002970"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.bill4pe.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "BILL4PE uses the camera to scan the merchant's UPI QR code so you can pay the correct payee.",
+        "NSPhotoLibraryUsageDescription": "BILL4PE needs access to your photos to upload a payment screenshot as proof.",
+        "NSPhotoLibraryAddUsageDescription": "BILL4PE saves generated receipts to your photo library when you choose to.",
+        "NSMicrophoneUsageDescription": "BILL4PE uses the microphone for voice expense entry.",
+        "ITSAppUsesNonExemptEncryption": false,
+        "LSApplicationQueriesSchemes": [
+          "upi",
+          "tez",
+          "phonepe",
+          "paytmmp"
+        ]
+      }
+    },
+    "android": {
+      "package": "com.bill4pe.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#002970"
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.INTERNET"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "bill4pay.com"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "BILL4PE uses the camera to scan the merchant's UPI QR code."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "BILL4PE needs access to your photos to upload a payment screenshot."
+        }
+      ],
+      "expo-font"
+    ],
+    "extra": {
+      "apiBaseUrl": "https://invoice-locked.preview.emergentagent.com/api",
+      "router": {
+        "origin": false
+      }
+    }
+  }
+}

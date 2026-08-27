@@ -1,0 +1,7 @@
+node_modules/
+.expo/
+dist/
+web-build/
+*.log
+.DS_Store
+# keep .env template committed for the preview default; use EAS secrets for prod
