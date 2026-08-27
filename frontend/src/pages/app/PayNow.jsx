@@ -142,6 +142,7 @@ export default function PayNow() {
   const [utrFull, setUtrFull] = useState('');
   const [utrLast4, setUtrLast4] = useState('');
   const [screenshot, setScreenshot] = useState(null);
+  const [extracting, setExtracting] = useState(false);
   const [needsFee, setNeedsFee] = useState(null);
 
   // Load draft + resume any pending transaction (app-close recovery, spec §35).
@@ -211,6 +212,29 @@ export default function PayNow() {
     try { const { data } = await api.post(`/manual-pay/${txn.transaction_id}/confirm`, { completed }); setTxn(data); }
     catch (e) { toast.error(e.response?.data?.detail || 'Failed'); }
     finally { setBusy(false); }
+  };
+
+  // When a payment screenshot is chosen, auto-read the 12-digit UTR with Gemini
+  // so the user doesn't have to type it. Falls back to manual entry on failure.
+  const onScreenshot = async (file) => {
+    setScreenshot(file || null);
+    if (!file) return;
+    setExtracting(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const { data } = await api.post('/ai/extract-utr', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      if (data?.found && data?.utr) {
+        setUtrFull(String(data.utr).replace(/\D/g, '').slice(0, 12));
+        toast.success('UTR auto-filled from screenshot ✓');
+      } else {
+        toast.message("Couldn't read the UTR — please type the 12-digit UTR.");
+      }
+    } catch (e) {
+      toast.message(e.response?.data?.detail || "Couldn't read the UTR — please type it.");
+    } finally {
+      setExtracting(false);
+    }
   };
 
   const submitProof = async () => {
@@ -361,9 +385,10 @@ export default function PayNow() {
             <label className="text-sm font-medium">Or last 4 digits</label>
             <Input value={utrLast4} onChange={(e) => setUtrLast4(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="1234" data-testid="utr-last4-input" />
           </div>
-          <label className="flex items-center justify-center gap-2 text-sm border border-dashed rounded-xl py-3 cursor-pointer hover:bg-muted/50">
-            <Upload className="h-4 w-4" /> {screenshot ? screenshot.name : 'Upload payment screenshot (optional)'}
-            <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => setScreenshot(e.target.files?.[0] || null)} data-testid="screenshot-input" />
+          <label className={`flex items-center justify-center gap-2 text-sm border border-dashed rounded-xl py-3 cursor-pointer hover:bg-muted/50 ${extracting ? 'opacity-70 pointer-events-none' : ''}`} data-testid="screenshot-label">
+            {extracting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            {extracting ? 'Reading UTR from screenshot…' : (screenshot ? screenshot.name : 'Upload payment screenshot to auto-read UTR')}
+            <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={extracting} onChange={(e) => onScreenshot(e.target.files?.[0] || null)} data-testid="screenshot-input" />
           </label>
           <Button className="w-full" disabled={busy} onClick={submitProof} data-testid="submit-proof-btn">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Submit proof'}</Button>
         </div>

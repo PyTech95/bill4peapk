@@ -7,9 +7,12 @@ Whisper dependency.
 """
 import json
 import os
+import asyncio
 import tempfile
+from io import BytesIO
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from PIL import Image
 
 from core.config import logger
 from core.security import get_current_user
@@ -22,6 +25,7 @@ from services.llm import (
 from services.audio import to_mp3
 from services.prompts import (
     RECEIPT_PROMPT,
+    UTR_EXTRACT_PROMPT,
     VALID_CATEGORIES,
     VOICE_AUDIO_PROMPT,
     category_prompt,
@@ -194,6 +198,59 @@ async def scan_receipt(file: UploadFile = File(...), user=Depends(get_current_us
     except Exception as e:
         logger.exception("Receipt OCR failed")
         raise _ai_error(e, "Receipt OCR failed")
+
+
+@router.post("/ai/extract-utr")
+async def extract_utr(file: UploadFile = File(...), user=Depends(get_current_user)):
+    """Read a UPI payment screenshot and auto-extract the 12-digit UTR.
+
+    Degrades gracefully: on AI timeout/overload it returns found=false (the client
+    then asks the user to type the UTR) instead of hanging past the gateway limit.
+    """
+    if not has_gemini():
+        raise HTTPException(500, "AI key not configured (GEMINI_API_KEY)")
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(400, "Empty file")
+    if len(raw) > 8 * 1024 * 1024:
+        raise HTTPException(400, "Image too large (max 8MB)")
+    mime, _suffix = _normalise_mime(file)
+    # Downscale large phone screenshots so the vision call stays well under the
+    # gateway timeout (fewer image tiles = a noticeably faster Gemini response).
+    try:
+        im = Image.open(BytesIO(raw)).convert("RGB")
+        im.thumbnail((1024, 1024))
+        buf = BytesIO()
+        im.save(buf, format="JPEG", quality=85)
+        raw = buf.getvalue()
+        mime = "image/jpeg"
+    except Exception:
+        pass
+    try:
+        reply = await asyncio.wait_for(
+            gemini_vision(
+                system_prompt=UTR_EXTRACT_PROMPT,
+                user_text="Extract the 12-digit UTR / UPI transaction reference number from this payment screenshot. Return strict JSON only.",
+                image_bytes=raw,
+                mime=mime,
+            ),
+            timeout=40,
+        )
+    except asyncio.TimeoutError:
+        logger.warning("UTR extraction timed out")
+        return {"utr": "", "found": False, "error": "AI is busy — please type the 12-digit UTR."}
+    except Exception as e:
+        logger.exception("UTR extraction failed")
+        return {"utr": "", "found": False, "error": "Couldn't read the UTR — please type it."}
+    txt = _extract_json_block(_strip_code_fence(reply), "{", "}")
+    try:
+        parsed = json.loads(txt)
+    except Exception:
+        parsed = {}
+    digits = "".join(c for c in str(parsed.get("utr", "")) if c.isdigit())
+    if len(digits) == 12:
+        return {"utr": digits, "found": True}
+    return {"utr": "", "found": False}
 
 
 @router.post("/voice/expense")

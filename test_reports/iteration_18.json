@@ -1,0 +1,28 @@
+{
+  "summary": "Iteration 18 verifies the NEW payment-screenshot -> auto-UTR feature end-to-end. Backend: 4/4 pytest cases PASSED on POST /api/ai/extract-utr (auth, positive extraction, no-UTR fallback, empty-file rejection). Frontend: Playwright drove register -> draft -> /app/pay -> single-scan manual UPI -> ready-to-pay -> payment-done -> proof-screen -> screenshot upload; the label switched to 'Reading UTR from screenshot…' with a spinner, then Gemini returned found=true and the UI auto-filled utr-full-input with '401234567890', showed '12/12 digits' and the success toast 'UTR auto-filled from screenshot ✓'. Regression: the 11-digit UTR still surfaces the 'UTR number must be exactly 12 digits' toast, and single-scan still lands directly on ready-to-pay (no second scan).\n\nBackend contract verified against public URL https://invoice-locked.preview.emergentagent.com/api:\n- Without token -> HTTP 401.\n- With a fabricated/on-disk UPI screenshot containing a printed 12-digit reference -> HTTP 200 {utr:'<12 digits>', found:true}, elapsed ~41s (well inside the 40s asyncio.wait_for + gateway 60s window, no 5xx).\n- With a blank/no-ref image -> HTTP 200 {utr:'', found:false}.\n- With empty file body -> HTTP 400 'Empty file'.\n- Endpoint never returned 5xx across the whole run (Gemini did NOT hit 503 during this iteration).\n\nFrontend UI verified in Playwright:\n- data-testid 'screenshot-label' initial text = 'Upload payment screenshot to auto-read UTR'.\n- After selecting /tmp/upi_shot.png on data-testid 'screenshot-input', label transitioned to 'Reading UTR from screenshot…' with the Loader2 spinner, then reverted to the filename once resolved.\n- utr-full-input value auto-populated with '401234567890'; utr-digit-count read '12/12 digits'; success toast 'UTR auto-filled from screenshot ✓' rendered.\n- Regression: typing '12345678901' (11 digits) and clicking submit-proof-btn raised the 'UTR number must be exactly 12 digits' toast.\n- Regression: manual UPI entry 'merchant@okaxis' lands DIRECTLY on data-testid 'ready-to-pay' (no second-scan step).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter18_utr_extract.py",
+    "/app/test_reports/pytest/iter18_results.xml",
+    "/app/test_reports/iter18_proof_screen.png"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "backend/routers/ai.py extract_utr: image size cap is checked BEFORE PIL downscale, so an 8MB screenshot is still read into memory first (fine). Consider streaming/limit at UploadFile boundary if abuse becomes a concern.",
+    "extract_utr swallows ALL exceptions into found=false (line 242). This is intentional per spec (never 5xx to client) but currently loses the distinction between a Gemini rate-limit (429) and a genuine parse error. Consider logging the exception class + status so ops can tell 503-storms apart from real bugs (logger.exception is already there — good).",
+    "PayNow.jsx onScreenshot() sets 'Content-Type: multipart/form-data' manually; axios normally sets the boundary automatically. Works here because axios overwrites it when a FormData is passed, but the explicit header is redundant and error-prone if the api wrapper is ever swapped for fetch.",
+    "PayNow.jsx line 174 still references the now-unreachable 'second_qr_required' state — harmless dead branch (already flagged in iter17)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter18_utr_extract.py",
+    "/app/frontend/public/upi_shot.png (test asset copy of /tmp/upi_shot.png for reproducibility)"
+  ],
+  "success_rate": {"backend": "100% (4/4)", "frontend": "100% (auto-fill + spinner + toast + 11-digit regression)"},
+  "test_credentials": "Fresh individual per run (qa_iter18_<uuid>@bill4petest.com / Test@1234, ₹50 wallet bonus). Super admin admin@newbill.com / NewBill@2026 unused this iteration.",
+  "seed_data_creation": "One fresh individual + one manual_transactions txn (₹25 merchant_amount) reaching proof-screen with UTR 401234567890. No production data touched. No Razorpay checkout invoked (test never clicked pay-fee-btn per LIVE-key safety note).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Regression suite for the auto-UTR feature is /app/backend/tests/test_iter18_utr_extract.py (4 tests). Combined with iter16 (deploy/auth/expenses/reports/payments-config) and iter17 (single-scan + 12-digit UTR), the manual UPI + AI-UTR flow is fully covered. IMPORTANT: LIVE Razorpay keys remain — DO NOT invoke /api/manual-pay/{tid}/fee-order + real checkout; keep merchant_amount <=₹25 so the ₹50 wallet bonus absorbs the 10% fee. Gemini extract-utr call takes ~35-45s under normal load; the endpoint is bounded to 40s and degrades to found=false on TimeoutError/Exception — treat a transient found=false as expected, only flag it if OUR endpoint returns 5xx. The test asset used is /tmp/upi_shot.png (also duplicated into frontend/public/upi_shot.png). Frontend fills fd.append('file', file) which matches the backend's expected multipart field name.",
+  "rca_of_the_issue": "N/A — the feature is implemented and verified working end-to-end."
+}

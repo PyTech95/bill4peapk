@@ -170,3 +170,17 @@ RULES:
 - If only a total is mentioned (e.g. "spent 250 on lunch"), create ONE item: name=sub_category, quantity=1, unit_price=total_amount.
 - If silent/unclear, return the JSON with "transcript":"" and total_amount 0.
 - Output JSON only, nothing else."""
+
+
+
+UTR_EXTRACT_PROMPT = """You are reading a screenshot of a UPI payment confirmation (Google Pay, PhonePe, Paytm, BHIM, or a bank app).
+
+Find the UTR / UPI transaction reference number. It is the 12-digit NUMERIC reference, often labelled "UTR", "UPI transaction ID", "UPI Ref No", "UPI Ref ID", "Reference ID", "RRN" or "Transaction ID". It is exactly 12 digits (0-9).
+
+Return ONLY a strict JSON object, no markdown, no prose, no code fences:
+{"utr":"<the 12 digit number, digits only>","found":true}
+
+Rules:
+- The UTR must be exactly 12 digits. Strip spaces and any non-digit characters.
+- If several numbers are present, choose the one labelled UTR / UPI transaction ID / reference / RRN — NOT the amount, phone number, account number or date.
+- If you cannot find a clear 12-digit UPI reference number, return {"utr":"","found":false}."""

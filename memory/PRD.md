@@ -272,3 +272,8 @@ is the tested primary. Real keys needed to exercise the fee-QR path.
 - KEYS: founder's GEMINI_API_KEY + LIVE Razorpay keys (rzp_live_) added to backend/.env; RAZORPAY_ENV=live. /api/payments/config -> enabled=true, mode=live. ⚠️ LIVE = real money on any Razorpay fee payment.
 - Verified: iteration_17.json — 8/8 backend + frontend E2E (single scan -> ready-to-pay -> proof 12-digit UTR -> wallet-first receipt generated, no real Razorpay checkout triggered).
 - Backlog cleanup (non-blocking): dead /second-scan route + PayNow.jsx line ~173 'second_qr_required' reference can be removed; set RAZORPAY_WEBHOOK_SECRET to enable the webhook safety-net.
+
+## Iter 18 — UTR auto-read from screenshot (feature, verified)
+- New endpoint POST /api/ai/extract-utr: downscales the uploaded UPI screenshot (PIL, max 1024px) and uses Gemini vision (UTR_EXTRACT_PROMPT) to pull the 12-digit UTR. Returns {utr, found}. Bounded by asyncio.wait_for(40s) and degrades to found=false (HTTP 200) on AI timeout/overload — never 5xx (avoids the 60s gateway 502).
+- PayNow.jsx: selecting a payment screenshot auto-calls the endpoint; label shows a "Reading UTR from screenshot…" spinner; on success the 12-digit UTR auto-fills utr-full-input (success toast), else the user is asked to type it.
+- Verified iteration_18.json: 4/4 backend + frontend E2E (auto-fill, spinner, toast) + regressions (single-scan, 11-digit UTR rejection) pass. Note: Gemini vision latency is ~5-11s when healthy, up to ~40s under Google "high demand" 503s (transient, handled).
