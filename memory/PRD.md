@@ -277,3 +277,7 @@ is the tested primary. Real keys needed to exercise the fee-QR path.
 - New endpoint POST /api/ai/extract-utr: downscales the uploaded UPI screenshot (PIL, max 1024px) and uses Gemini vision (UTR_EXTRACT_PROMPT) to pull the 12-digit UTR. Returns {utr, found}. Bounded by asyncio.wait_for(40s) and degrades to found=false (HTTP 200) on AI timeout/overload — never 5xx (avoids the 60s gateway 502).
 - PayNow.jsx: selecting a payment screenshot auto-calls the endpoint; label shows a "Reading UTR from screenshot…" spinner; on success the 12-digit UTR auto-fills utr-full-input (success toast), else the user is asked to type it.
 - Verified iteration_18.json: 4/4 backend + frontend E2E (auto-fill, spinner, toast) + regressions (single-scan, 11-digit UTR rejection) pass. Note: Gemini vision latency is ~5-11s when healthy, up to ~40s under Google "high demand" 503s (transient, handled).
+
+## Iter 19 — UTR read switched to Flash-Lite (faster)
+- gemini_vision() now takes an optional model override. New config GEMINI_UTR_MODEL (default gemini-flash-lite-latest).
+- /api/ai/extract-utr now uses Flash-Lite: latency dropped from ~5-40s to ~0.7-1.1s (verified local + public), still accurate (reads 12-digit UTR; returns found=false for images with no reference). Endpoint contract unchanged (frontend untouched).

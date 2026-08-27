@@ -92,14 +92,15 @@ def has_key() -> bool:
 
 
 # ---------------- Gemini: vision (image understanding) ----------------
-async def gemini_vision(system_prompt: str, user_text: str, image_bytes: bytes, mime: str) -> str:
+async def gemini_vision(system_prompt: str, user_text: str, image_bytes: bytes, mime: str, model: str | None = None) -> str:
+    _model = model or GEMINI_VISION_MODEL
     if GEMINI_API_KEY:
         def _run():
             from google import genai
             from google.genai import types
             client = genai.Client(api_key=GEMINI_API_KEY)
             resp = client.models.generate_content(
-                model=GEMINI_VISION_MODEL,
+                model=_model,
                 contents=[types.Part.from_bytes(data=image_bytes, mime_type=mime or "image/jpeg"), user_text],
                 config=types.GenerateContentConfig(system_instruction=system_prompt),
             )
@@ -110,7 +111,7 @@ async def gemini_vision(system_prompt: str, user_text: str, image_bytes: bytes, 
         from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
         b64 = base64.b64encode(image_bytes).decode()
         chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=f"vision-{uuid.uuid4()}",
-                       system_message=system_prompt).with_model("gemini", GEMINI_VISION_MODEL)
+                       system_message=system_prompt).with_model("gemini", _model)
         reply = await chat.send_message(UserMessage(text=user_text, file_contents=[ImageContent(image_base64=b64)]))
         return (reply or "").strip()
     return await _retry(_emergent, label="gemini_vision")

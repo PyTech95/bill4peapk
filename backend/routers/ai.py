@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from PIL import Image
 
 from core.config import logger
+from core.config import GEMINI_UTR_MODEL
 from core.security import get_current_user
 from services.llm import (
     gemini_text,
@@ -233,6 +234,7 @@ async def extract_utr(file: UploadFile = File(...), user=Depends(get_current_use
                 user_text="Extract the 12-digit UTR / UPI transaction reference number from this payment screenshot. Return strict JSON only.",
                 image_bytes=raw,
                 mime=mime,
+                model=GEMINI_UTR_MODEL,
             ),
             timeout=40,
         )

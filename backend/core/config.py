@@ -51,6 +51,9 @@ GEMINI_VISION_MODEL = os.environ.get("GEMINI_VISION_MODEL", "gemini-flash-latest
 # Audio uses the lighter/faster Flash-Lite alias — voice transcription is latency
 # sensitive and flash-lite responds noticeably quicker for short clips.
 GEMINI_AUDIO_MODEL = os.environ.get("GEMINI_AUDIO_MODEL", "gemini-flash-lite-latest")
+# UTR/reference OCR from a payment screenshot is a trivial extraction task, so it
+# uses the lighter/faster Flash-Lite alias — resolves in ~1-3s vs the heavier Flash.
+GEMINI_UTR_MODEL = os.environ.get("GEMINI_UTR_MODEL", "gemini-flash-lite-latest")
 
 # ----------------------------------------------------------------------------
 # COLLECT-AND-PAYOUT model (v2): customer pays merchant_amount + platform fee to
